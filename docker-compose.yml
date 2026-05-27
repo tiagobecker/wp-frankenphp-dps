@@ -1,0 +1,208 @@
+services:
+  wordpress:
+    build:
+      context: .
+      dockerfile: frankenphp/Dockerfile
+      args:
+        FRANKENPHP_IMAGE: ${FRANKENPHP_IMAGE:-dunglas/frankenphp:1-php8.5-trixie}
+    restart: unless-stopped
+    expose:
+      - "80"
+    depends_on:
+      mariadb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      SERVER_NAME: "${SERVER_NAME:-:80}"
+      WORDPRESS_DB_HOST: "mariadb:3306"
+      WORDPRESS_DB_NAME: ${WORDPRESS_DB_NAME:-wordpress}
+      WORDPRESS_DB_USER: ${WORDPRESS_DB_USER:-wordpress}
+      WORDPRESS_DB_PASSWORD: ${WORDPRESS_DB_PASSWORD:?set WORDPRESS_DB_PASSWORD}
+      WORDPRESS_TABLE_PREFIX: ${WORDPRESS_TABLE_PREFIX:-wp_}
+      WORDPRESS_HOME: ${WORDPRESS_HOME:?set WORDPRESS_HOME}
+      WORDPRESS_SITEURL: ${WORDPRESS_SITEURL:?set WORDPRESS_SITEURL}
+      WORDPRESS_ENVIRONMENT_TYPE: ${WORDPRESS_ENVIRONMENT_TYPE:-production}
+      WORDPRESS_DEBUG: ${WORDPRESS_DEBUG:-false}
+      WORDPRESS_FORCE_SSL_ADMIN: ${WORDPRESS_FORCE_SSL_ADMIN:-true}
+      WORDPRESS_DISABLE_WP_CRON: ${WORDPRESS_DISABLE_WP_CRON:-true}
+      WORDPRESS_CONFIG_EXTRA: ${WORDPRESS_CONFIG_EXTRA:-}
+      WORDPRESS_AUTO_INSTALL: ${WORDPRESS_AUTO_INSTALL:-false}
+      WORDPRESS_SITE_TITLE: ${WORDPRESS_SITE_TITLE:-WordPress FrankenPHP}
+      WORDPRESS_ADMIN_USER: ${WORDPRESS_ADMIN_USER:-admin}
+      WORDPRESS_ADMIN_PASSWORD: ${WORDPRESS_ADMIN_PASSWORD:-}
+      WORDPRESS_ADMIN_EMAIL: ${WORDPRESS_ADMIN_EMAIL:-admin@example.com}
+      WORDPRESS_LOCALE: ${WORDPRESS_LOCALE:-pt_BR}
+      WORDPRESS_INSTALL_REDIS_PLUGIN: ${WORDPRESS_INSTALL_REDIS_PLUGIN:-false}
+      WORDPRESS_AUTH_KEY: ${WORDPRESS_AUTH_KEY:-}
+      WORDPRESS_SECURE_AUTH_KEY: ${WORDPRESS_SECURE_AUTH_KEY:-}
+      WORDPRESS_LOGGED_IN_KEY: ${WORDPRESS_LOGGED_IN_KEY:-}
+      WORDPRESS_NONCE_KEY: ${WORDPRESS_NONCE_KEY:-}
+      WORDPRESS_AUTH_SALT: ${WORDPRESS_AUTH_SALT:-}
+      WORDPRESS_SECURE_AUTH_SALT: ${WORDPRESS_SECURE_AUTH_SALT:-}
+      WORDPRESS_LOGGED_IN_SALT: ${WORDPRESS_LOGGED_IN_SALT:-}
+      WORDPRESS_NONCE_SALT: ${WORDPRESS_NONCE_SALT:-}
+      WORDPRESS_REDIS_HOST: redis
+      WORDPRESS_REDIS_PORT: 6379
+      WORDPRESS_REDIS_DATABASE: 0
+      WORDPRESS_REDIS_PREFIX: "${COMPOSE_PROJECT_NAME:-wp-frankenphp-dps}:"
+      PHP_MEMORY_LIMIT: ${PHP_MEMORY_LIMIT:-256M}
+      PHP_MAX_EXECUTION_TIME: ${PHP_MAX_EXECUTION_TIME:-300}
+      PHP_UPLOAD_MAX_FILESIZE: ${PHP_UPLOAD_MAX_FILESIZE:-256M}
+      PHP_POST_MAX_SIZE: ${PHP_POST_MAX_SIZE:-256M}
+      PHP_MAX_INPUT_VARS: ${PHP_MAX_INPUT_VARS:-5000}
+      GOMEMLIMIT: ${GOMEMLIMIT:-768MiB}
+      FRANKENPHP_NUM_THREADS: ${FRANKENPHP_NUM_THREADS:-2}
+      FRANKENPHP_MAX_THREADS: ${FRANKENPHP_MAX_THREADS:-auto}
+      FRANKENPHP_MAX_REQUESTS: ${FRANKENPHP_MAX_REQUESTS:-1000}
+      FRANKENPHP_MAX_WAIT_TIME: ${FRANKENPHP_MAX_WAIT_TIME:-30s}
+    volumes:
+      - wordpress_data:/app/public
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1/healthz >/dev/null"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+    cpus: ${WORDPRESS_CPUS:-1.0}
+    mem_limit: ${WORDPRESS_MEMORY_LIMIT:-1024M}
+    mem_reservation: ${WORDPRESS_MEMORY_RESERVATION:-512M}
+    deploy:
+      resources:
+        limits:
+          cpus: "${WORDPRESS_CPUS:-1.0}"
+          memory: ${WORDPRESS_MEMORY_LIMIT:-1024M}
+        reservations:
+          memory: ${WORDPRESS_MEMORY_RESERVATION:-512M}
+
+  wp-cron:
+    build:
+      context: .
+      dockerfile: frankenphp/Dockerfile
+      args:
+        FRANKENPHP_IMAGE: ${FRANKENPHP_IMAGE:-dunglas/frankenphp:1-php8.5-trixie}
+    restart: unless-stopped
+    command: ["wp-cron-runner"]
+    depends_on:
+      mariadb:
+        condition: service_healthy
+      wordpress:
+        condition: service_healthy
+    environment:
+      WORDPRESS_DB_HOST: "mariadb:3306"
+      WORDPRESS_DB_NAME: ${WORDPRESS_DB_NAME:-wordpress}
+      WORDPRESS_DB_USER: ${WORDPRESS_DB_USER:-wordpress}
+      WORDPRESS_DB_PASSWORD: ${WORDPRESS_DB_PASSWORD:?set WORDPRESS_DB_PASSWORD}
+      WORDPRESS_TABLE_PREFIX: ${WORDPRESS_TABLE_PREFIX:-wp_}
+      WORDPRESS_HOME: ${WORDPRESS_HOME:?set WORDPRESS_HOME}
+      WORDPRESS_SITEURL: ${WORDPRESS_SITEURL:?set WORDPRESS_SITEURL}
+      WORDPRESS_ENVIRONMENT_TYPE: ${WORDPRESS_ENVIRONMENT_TYPE:-production}
+      WORDPRESS_DEBUG: ${WORDPRESS_DEBUG:-false}
+      WORDPRESS_FORCE_SSL_ADMIN: ${WORDPRESS_FORCE_SSL_ADMIN:-true}
+      WORDPRESS_DISABLE_WP_CRON: ${WORDPRESS_DISABLE_WP_CRON:-true}
+      WORDPRESS_CRON_INTERVAL: ${WORDPRESS_CRON_INTERVAL:-60}
+      WORDPRESS_AUTH_KEY: ${WORDPRESS_AUTH_KEY:-}
+      WORDPRESS_SECURE_AUTH_KEY: ${WORDPRESS_SECURE_AUTH_KEY:-}
+      WORDPRESS_LOGGED_IN_KEY: ${WORDPRESS_LOGGED_IN_KEY:-}
+      WORDPRESS_NONCE_KEY: ${WORDPRESS_NONCE_KEY:-}
+      WORDPRESS_AUTH_SALT: ${WORDPRESS_AUTH_SALT:-}
+      WORDPRESS_SECURE_AUTH_SALT: ${WORDPRESS_SECURE_AUTH_SALT:-}
+      WORDPRESS_LOGGED_IN_SALT: ${WORDPRESS_LOGGED_IN_SALT:-}
+      WORDPRESS_NONCE_SALT: ${WORDPRESS_NONCE_SALT:-}
+      WORDPRESS_REDIS_HOST: redis
+      WORDPRESS_REDIS_PORT: 6379
+      WORDPRESS_REDIS_DATABASE: 0
+      WORDPRESS_REDIS_PREFIX: "${COMPOSE_PROJECT_NAME:-wp-frankenphp-dps}:"
+      PHP_MEMORY_LIMIT: ${PHP_MEMORY_LIMIT:-256M}
+      PHP_MAX_EXECUTION_TIME: ${PHP_MAX_EXECUTION_TIME:-300}
+      PHP_UPLOAD_MAX_FILESIZE: ${PHP_UPLOAD_MAX_FILESIZE:-256M}
+      PHP_POST_MAX_SIZE: ${PHP_POST_MAX_SIZE:-256M}
+      PHP_MAX_INPUT_VARS: ${PHP_MAX_INPUT_VARS:-5000}
+    volumes:
+      - wordpress_data:/app/public
+    cpus: ${WP_CRON_CPUS:-0.25}
+    mem_limit: ${WP_CRON_MEMORY_LIMIT:-256M}
+    deploy:
+      resources:
+        limits:
+          cpus: "${WP_CRON_CPUS:-0.25}"
+          memory: ${WP_CRON_MEMORY_LIMIT:-256M}
+
+  mariadb:
+    image: ${MARIADB_IMAGE:-mariadb:11}
+    restart: unless-stopped
+    environment:
+      MARIADB_ROOT_PASSWORD: ${MARIADB_ROOT_PASSWORD:?set MARIADB_ROOT_PASSWORD}
+      MARIADB_DATABASE: ${WORDPRESS_DB_NAME:-wordpress}
+      MARIADB_USER: ${WORDPRESS_DB_USER:-wordpress}
+      MARIADB_PASSWORD: ${WORDPRESS_DB_PASSWORD:?set WORDPRESS_DB_PASSWORD}
+      MARIADB_AUTO_UPGRADE: "1"
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --skip-name-resolve
+      - --transaction-isolation=READ-COMMITTED
+      - --innodb-buffer-pool-size=${MARIADB_INNODB_BUFFER_POOL_SIZE:-384M}
+      - --max-connections=${MARIADB_MAX_CONNECTIONS:-100}
+    volumes:
+      - mariadb_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mariadb-admin ping -h 127.0.0.1 -uroot -p\"$${MARIADB_ROOT_PASSWORD}\" --silent"]
+      interval: 30s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+    cpus: ${MARIADB_CPUS:-1.0}
+    mem_limit: ${MARIADB_MEMORY_LIMIT:-1024M}
+    mem_reservation: ${MARIADB_MEMORY_RESERVATION:-512M}
+    deploy:
+      resources:
+        limits:
+          cpus: "${MARIADB_CPUS:-1.0}"
+          memory: ${MARIADB_MEMORY_LIMIT:-1024M}
+        reservations:
+          memory: ${MARIADB_MEMORY_RESERVATION:-512M}
+
+  redis:
+    image: ${REDIS_IMAGE:-redis:7-alpine}
+    restart: unless-stopped
+    command:
+      - redis-server
+      - --appendonly
+      - "yes"
+      - --maxmemory
+      - ${REDIS_MAXMEMORY:-128mb}
+      - --maxmemory-policy
+      - ${REDIS_MAXMEMORY_POLICY:-allkeys-lru}
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    cpus: ${REDIS_CPUS:-0.25}
+    mem_limit: ${REDIS_MEMORY_LIMIT:-256M}
+    deploy:
+      resources:
+        limits:
+          cpus: "${REDIS_CPUS:-0.25}"
+          memory: ${REDIS_MEMORY_LIMIT:-256M}
+
+volumes:
+  wordpress_data:
+    driver: ${DPS_VOLUME_DRIVER:-dps}
+    driver_opts:
+      size: ${WORDPRESS_VOLUME_SIZE:-10G}
+      inodes: "${WORDPRESS_VOLUME_INODES:-500000}"
+  mariadb_data:
+    driver: ${DPS_VOLUME_DRIVER:-dps}
+    driver_opts:
+      size: ${MARIADB_VOLUME_SIZE:-5G}
+      inodes: "${MARIADB_VOLUME_INODES:-300000}"
+  redis_data:
+    driver: ${DPS_VOLUME_DRIVER:-dps}
+    driver_opts:
+      size: ${REDIS_VOLUME_SIZE:-1G}
+      inodes: "${REDIS_VOLUME_INODES:-100000}"

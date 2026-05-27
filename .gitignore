@@ -1,0 +1,16 @@
+.env
+.env.*
+!.env.example
+!dokploy.env.example
+
+.DS_Store
+wordpress/
+vendor/
+node_modules/
+
+*.log
+*.sql
+*.sql.gz
+*.tar
+*.tar.gz
+*.zip

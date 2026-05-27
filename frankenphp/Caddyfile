@@ -1,0 +1,62 @@
+{
+	admin off
+	auto_https off
+
+	log {
+		output stdout
+		format json
+		level INFO
+	}
+
+	servers {
+		trusted_proxies static private_ranges
+	}
+
+	frankenphp {
+		num_threads {$FRANKENPHP_NUM_THREADS}
+		max_threads {$FRANKENPHP_MAX_THREADS}
+		max_wait_time {$FRANKENPHP_MAX_WAIT_TIME}
+		max_requests {$FRANKENPHP_MAX_REQUESTS}
+	}
+}
+
+{$SERVER_NAME} {
+	root * /app/public
+	encode zstd br gzip
+
+	@health path /healthz
+	respond @health "ok" 200
+
+	@hidden {
+		path /.*
+		not path /.well-known/*
+	}
+	respond @hidden 404
+
+	@sensitive {
+		path /wp-config.php /wp-config-sample.php /readme.html /license.txt /composer.json /composer.lock
+	}
+	respond @sensitive 404
+
+	@static {
+		path *.avif *.css *.gif *.ico *.jpg *.jpeg *.js *.map *.png *.svg *.ttf *.webp *.woff *.woff2
+	}
+	header @static Cache-Control "public, max-age=31536000, immutable"
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "SAMEORIGIN"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+		-Server
+		-X-Powered-By
+	}
+
+	php_server {
+		root /app/public
+		index index.php
+		try_files {path} {path}/index.php index.php
+		resolve_root_symlink false
+	}
+}
