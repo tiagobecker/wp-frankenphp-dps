@@ -192,17 +192,8 @@ services:
 
 volumes:
   wordpress_data:
-    driver: ${DPS_VOLUME_DRIVER:-dps}
-    driver_opts:
-      size: ${WORDPRESS_VOLUME_SIZE:-10G}
-      inodes: "${WORDPRESS_VOLUME_INODES:-500000}"
+    driver: ${DPS_VOLUME_DRIVER:-local}
   mariadb_data:
-    driver: ${DPS_VOLUME_DRIVER:-dps}
-    driver_opts:
-      size: ${MARIADB_VOLUME_SIZE:-5G}
-      inodes: "${MARIADB_VOLUME_INODES:-300000}"
+    driver: ${DPS_VOLUME_DRIVER:-local}
   redis_data:
-    driver: ${DPS_VOLUME_DRIVER:-dps}
-    driver_opts:
-      size: ${REDIS_VOLUME_SIZE:-1G}
-      inodes: "${REDIS_VOLUME_INODES:-100000}"
+    driver: ${DPS_VOLUME_DRIVER:-local}
