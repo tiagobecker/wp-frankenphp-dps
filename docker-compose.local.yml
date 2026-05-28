@@ -1,0 +1,7 @@
+volumes:
+  wordpress_data: !override
+    driver: local
+  mariadb_data: !override
+    driver: local
+  redis_data: !override
+    driver: local
