@@ -15,7 +15,7 @@ RUN set -eux; \
         bcmath \
         exif \
         gd \
-        imagick \
+        Imagick/imagick@70087bab33eab913e99ac77d64d04d1a2fd0b7b0 \
         intl \
         mysqli \
         opcache \
