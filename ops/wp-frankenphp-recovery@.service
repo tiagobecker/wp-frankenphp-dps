@@ -1,0 +1,19 @@
+[Unit]
+Description=Recover WordPress FrankenPHP Compose project %i after Docker startup
+Requires=docker.service
+PartOf=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=oneshot
+Environment=RECOVERY_TIMEOUT=600
+Environment=RECOVERY_INTERVAL=5
+ExecStart=/usr/local/sbin/wp-frankenphp-recover %i
+RemainAfterExit=yes
+Restart=on-failure
+RestartSec=30s
+
+[Install]
+WantedBy=multi-user.target

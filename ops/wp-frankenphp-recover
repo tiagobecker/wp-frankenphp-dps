@@ -1,0 +1,91 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+project="${1:?usage: wp-frankenphp-recover COMPOSE_PROJECT_NAME}"
+timeout="${RECOVERY_TIMEOUT:-600}"
+interval="${RECOVERY_INTERVAL:-5}"
+started_at="$SECONDS"
+
+if ! [[ "$timeout" =~ ^[1-9][0-9]*$ ]] || ! [[ "$interval" =~ ^[1-9][0-9]*$ ]]; then
+	echo "RECOVERY_TIMEOUT and RECOVERY_INTERVAL must be positive integers." >&2
+	exit 2
+fi
+
+container_id() {
+	docker ps -aq \
+		--filter "label=com.docker.compose.project=${project}" \
+		--filter "label=com.docker.compose.service=$1" \
+		| head -n 1
+}
+
+wait_for_docker() {
+	until docker info >/dev/null 2>&1; do
+		check_timeout "Docker daemon"
+		sleep "$interval"
+	done
+}
+
+check_timeout() {
+	local subject="$1"
+	if [ $((SECONDS - started_at)) -ge "$timeout" ]; then
+		echo "Timed out after ${timeout}s waiting for ${subject}." >&2
+		exit 1
+	fi
+}
+
+start_service() {
+	local service="$1"
+	local id output
+
+	while true; do
+		id="$(container_id "$service")"
+		if [ -n "$id" ]; then
+			if output="$(docker start "$id" 2>&1)"; then
+				echo "Started ${project}/${service}."
+				return 0
+			fi
+			echo "Unable to start ${project}/${service}: ${output}" >&2
+		else
+			echo "Container for ${project}/${service} has not been created yet." >&2
+		fi
+
+		check_timeout "${project}/${service} (Docker network or volume driver may still be unavailable)"
+		sleep "$interval"
+	done
+}
+
+wait_for_healthy() {
+	local service="$1"
+	local id status output
+
+	while true; do
+		id="$(container_id "$service")"
+		status="$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$id" 2>/dev/null || true)"
+		if [ "$status" = "healthy" ] || [ "$status" = "running" ]; then
+			echo "${project}/${service} is ${status}."
+			return 0
+		fi
+
+		# A mount/network failure can leave the container exited without another
+		# automatic attempt, so retry docker start while waiting.
+		if [ "$status" = "exited" ] || [ "$status" = "dead" ] || [ -z "$status" ]; then
+			if ! output="$(docker start "$id" 2>&1)"; then
+				echo "Unable to restart ${project}/${service}: ${output}" >&2
+			fi
+		fi
+
+		check_timeout "${project}/${service} readiness (current status: ${status:-missing})"
+		sleep "$interval"
+	done
+}
+
+wait_for_docker
+start_service mariadb
+start_service redis
+wait_for_healthy mariadb
+wait_for_healthy redis
+start_service wordpress
+wait_for_healthy wordpress
+start_service wp-cron
+
+echo "Recovery completed for Compose project ${project}."

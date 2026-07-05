@@ -37,6 +37,46 @@ No primeiro boot, o entrypoint baixa o WordPress no volume `wordpress_data`, cri
 
 Se `WORDPRESS_AUTO_INSTALL=false`, finalize pelo instalador web do WordPress. Se `WORDPRESS_AUTO_INSTALL=true`, defina também `WORDPRESS_ADMIN_PASSWORD`.
 
+O entrypoint aguarda MariaDB sem limite por padrão (`STARTUP_WAIT_TIMEOUT=0`). Isso é intencional: uma demora na rede, no volume DPS ou no banco após reiniciar o host mantém o processo vivo até a dependência voltar. Defina um valor em segundos somente se preferir falhar e deixar `restart: always` criar uma nova tentativa.
+
+## Recuperação Após Reboot Do Host
+
+O status `Exited (255)` em todos os quatro serviços não é causado pelo healthcheck. O Docker apenas registra o estado `healthy/unhealthy`; ele não encerra o container. Como todos os serviços desta stack montam um volume DPS, a causa mais provável é o Docker tentar montar os volumes antes de o driver estar pronto. A mesma falha pode acontecer se a rede do Docker ainda não estiver disponível.
+
+Esta stack usa quatro proteções:
+
+- `restart: always` em todos os serviços;
+- healthchecks com `start_period` maior para hosts lentos;
+- dependências iniciadas sem bloquear o comando do Dokploy até ficarem saudáveis;
+- espera interna por MariaDB no `wordpress` e `wp-cron`, sem corrida para alterar `wp-config.php`.
+
+Uma falha que acontece antes de o processo do container iniciar, como erro no `VolumeDriver.Mount`, não pode ser corrigida de dentro do Compose. Para esse caso, instale no host Ubuntu o recuperador systemd incluído neste repositório. Ele espera Docker, tenta iniciar MariaDB/Redis até os volumes montarem e só então inicia WordPress e cron:
+
+```sh
+sudo install -m 0755 ops/wp-frankenphp-recover /usr/local/sbin/wp-frankenphp-recover
+sudo install -m 0644 ops/wp-frankenphp-recovery@.service /etc/systemd/system/wp-frankenphp-recovery@.service
+sudo systemctl daemon-reload
+sudo systemctl enable "wp-frankenphp-recovery@SEU_COMPOSE_PROJECT_NAME.service"
+```
+
+Use exatamente o valor efetivo de `COMPOSE_PROJECT_NAME`. Para testar sem reiniciar:
+
+```sh
+sudo systemctl start "wp-frankenphp-recovery@SEU_COMPOSE_PROJECT_NAME.service"
+sudo journalctl -u "wp-frankenphp-recovery@SEU_COMPOSE_PROJECT_NAME.service" -n 100 --no-pager
+```
+
+Se continuar em `Exited (255)`, capture o erro do runtime, que é mais útil que o exit code:
+
+```sh
+docker inspect --format '{{json .State}}' NOME_DO_CONTAINER
+docker plugin ls
+docker volume inspect NOME_DO_VOLUME
+sudo journalctl -u docker -b --no-pager | tail -n 300
+```
+
+Procure especialmente por `error while mounting volume`, `plugin ... not found`, `network not found`, corrupção no MariaDB ou OOM. O recuperador trata indisponibilidade transitória; ele não mascara corrupção de dados nem falta permanente do plugin DPS.
+
 ## Volumes
 
 Os volumes usam `driver: dps` por padrão, com quota e inodes declarados por ambiente:

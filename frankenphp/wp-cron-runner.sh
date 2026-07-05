@@ -4,6 +4,11 @@ set -Eeuo pipefail
 wp_path=/app/public
 interval="${WORDPRESS_CRON_INTERVAL:-60}"
 
+if ! [[ "$interval" =~ ^[1-9][0-9]*$ ]]; then
+	echo "WORDPRESS_CRON_INTERVAL must be a positive integer." >&2
+	exit 1
+fi
+
 echo "Starting WordPress cron runner with interval ${interval}s."
 
 while true; do

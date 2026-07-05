@@ -21,26 +21,58 @@ require_env() {
 wait_for_database() {
 	local host="${WORDPRESS_DB_HOST%%:*}"
 	local port="${WORDPRESS_DB_HOST##*:}"
+	local timeout="${STARTUP_WAIT_TIMEOUT:-0}"
+	local interval="${STARTUP_WAIT_INTERVAL:-5}"
+	local started_at="$SECONDS"
+	local attempt=0
 
 	if [ "$host" = "$port" ]; then
 		port=3306
 	fi
 
+	if ! [[ "$timeout" =~ ^[0-9]+$ ]] || ! [[ "$interval" =~ ^[1-9][0-9]*$ ]]; then
+		echo "STARTUP_WAIT_TIMEOUT must be zero or a positive integer and STARTUP_WAIT_INTERVAL must be a positive integer." >&2
+		exit 1
+	fi
+
 	echo "Waiting for MariaDB at ${host}:${port}..."
-	for _ in $(seq 1 60); do
+	while true; do
+		attempt=$((attempt + 1))
 		if mysqladmin ping \
 			--host="$host" \
 			--port="$port" \
 			--user="$WORDPRESS_DB_USER" \
 			--password="$WORDPRESS_DB_PASSWORD" \
 			--silent >/dev/null 2>&1; then
+			echo "MariaDB is ready."
 			return 0
 		fi
-		sleep 2
-	done
 
-	echo "MariaDB did not become ready in time." >&2
-	exit 1
+		if [ "$timeout" -gt 0 ] && [ $((SECONDS - started_at)) -ge "$timeout" ]; then
+			echo "MariaDB did not become ready within ${timeout}s." >&2
+			exit 1
+		fi
+
+		if [ $((attempt % 12)) -eq 0 ]; then
+			echo "MariaDB is still unavailable; continuing to wait..."
+		fi
+		sleep "$interval"
+	done
+}
+
+wait_for_wordpress_files() {
+	local timeout="${STARTUP_WAIT_TIMEOUT:-0}"
+	local interval="${STARTUP_WAIT_INTERVAL:-5}"
+	local started_at="$SECONDS"
+
+	echo "Waiting for the WordPress runtime files..."
+	while [ ! -f "$wp_path/wp-load.php" ] || [ ! -f "$wp_path/wp-config.php" ]; do
+		if [ "$timeout" -gt 0 ] && [ $((SECONDS - started_at)) -ge "$timeout" ]; then
+			echo "WordPress runtime files did not become ready within ${timeout}s." >&2
+			exit 1
+		fi
+		sleep "$interval"
+	done
 }
 
 wp_cmd() {
@@ -232,6 +264,14 @@ main() {
 
 	mkdir -p "$wp_path"
 	wait_for_database
+
+	# The cron container shares the WordPress volume. It must not rewrite
+	# wp-config.php concurrently with the web container during daemon startup.
+	if [ "${1:-}" = "wp-cron-runner" ]; then
+		wait_for_wordpress_files
+		exec "$@"
+	fi
+
 	install_wordpress_core
 	maybe_install_site
 	maybe_enable_redis_plugin
