@@ -123,20 +123,22 @@ services:
       WORDPRESS_REDIS_PREFIX: "${COMPOSE_PROJECT_NAME:-wp-frankenphp-dps}:"
       STARTUP_WAIT_TIMEOUT: ${STARTUP_WAIT_TIMEOUT:-0}
       STARTUP_WAIT_INTERVAL: ${STARTUP_WAIT_INTERVAL:-5}
-      PHP_MEMORY_LIMIT: ${PHP_MEMORY_LIMIT:-256M}
+      PHP_MEMORY_LIMIT: ${WP_CRON_PHP_MEMORY_LIMIT:-512M}
       PHP_MAX_EXECUTION_TIME: ${PHP_MAX_EXECUTION_TIME:-300}
       PHP_UPLOAD_MAX_FILESIZE: ${PHP_UPLOAD_MAX_FILESIZE:-256M}
       PHP_POST_MAX_SIZE: ${PHP_POST_MAX_SIZE:-256M}
       PHP_MAX_INPUT_VARS: ${PHP_MAX_INPUT_VARS:-5000}
     volumes:
       - wordpress_data:/app/public
-    cpus: ${WP_CRON_CPUS:-0.25}
-    mem_limit: ${WP_CRON_MEMORY_LIMIT:-256M}
+    healthcheck:
+      disable: true
+    cpus: ${WP_CRON_CPUS:-0.5}
+    mem_limit: ${WP_CRON_MEMORY_LIMIT:-768M}
     deploy:
       resources:
         limits:
-          cpus: "${WP_CRON_CPUS:-0.25}"
-          memory: ${WP_CRON_MEMORY_LIMIT:-256M}
+          cpus: "${WP_CRON_CPUS:-0.5}"
+          memory: ${WP_CRON_MEMORY_LIMIT:-768M}
 
   mariadb:
     image: ${MARIADB_IMAGE:-mariadb:11}

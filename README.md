@@ -28,8 +28,11 @@ Os limites de CPU, memória e armazenamento são controlados por variáveis:
 - CPU/memória: `WORDPRESS_CPUS`, `WORDPRESS_MEMORY_LIMIT`, `MARIADB_CPUS`, `MARIADB_MEMORY_LIMIT`, `REDIS_CPUS`, `REDIS_MEMORY_LIMIT`.
 - DPS/storage: `WORDPRESS_VOLUME_SIZE`, `MARIADB_VOLUME_SIZE`, `REDIS_VOLUME_SIZE` e os respectivos `*_INODES`.
 - FrankenPHP/PHP: `FRANKENPHP_NUM_THREADS`, `FRANKENPHP_MAX_THREADS`, `PHP_MEMORY_LIMIT`, `GOMEMLIMIT`.
+- Cron WordPress: `WORDPRESS_CRON_INTERVAL`, `WP_CRON_CPUS`, `WP_CRON_MEMORY_LIMIT`, `WP_CRON_PHP_MEMORY_LIMIT`.
 
 Mantenha `FRANKENPHP_NUM_THREADS * PHP_MEMORY_LIMIT` abaixo da memória disponível para o container `wordpress`.
+
+O serviço `wp-cron` é um worker WP-CLI e não sobe Caddy/FrankenPHP. Por isso ele desabilita healthcheck explicitamente: um healthcheck HTTP como `/healthz` sempre falharia nesse container, mesmo com o cron funcionando.
 
 ## Primeiro Boot
 
